@@ -2,18 +2,21 @@ import request from "supertest";
 import app from "../src/app.js";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { MongoMemoryServer } from "mongodb-memory-server";
 
 dotenv.config();
 
 let token;
 let taskId;
+let mongoServer;
 
 // Set up and tear down
 beforeAll(async () => {
   try {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/taskmanager_test";
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
     await mongoose.connect(mongoUri);
-    console.log("Test DB connected");
+    console.log("Test DB connected (in-memory)");
   } catch (error) {
     console.error("Could not connect to test database:", error.message);
   }
@@ -44,6 +47,9 @@ afterAll(async () => {
       await mongoose.connection.db.dropDatabase();
     }
     await mongoose.connection.close();
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
   } catch (error) {
     console.error("Error closing test database:", error.message);
   }
