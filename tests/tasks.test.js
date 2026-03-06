@@ -1,10 +1,26 @@
 import request from "supertest";
 import app from "../src/app.js";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import { MongoMemoryServer } from "mongodb-memory-server";
+
+dotenv.config();
 
 let token;
 let taskId;
+let mongoServer;
 
+// Set up and tear down
 beforeAll(async () => {
+  try {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+    console.log("Test DB connected (in-memory)");
+  } catch (error) {
+    console.error("Could not connect to test database:", error.message);
+  }
+
   // Register
   await request(app)
     .post("/api/auth/register")
@@ -23,7 +39,21 @@ beforeAll(async () => {
     });
 
   token = res.body.token;
-});
+}, 30000);
+
+afterAll(async () => {
+  try {
+    if (mongoose.connection.db) {
+      await mongoose.connection.db.dropDatabase();
+    }
+    await mongoose.connection.close();
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
+  } catch (error) {
+    console.error("Error closing test database:", error.message);
+  }
+}, 30000);
 
 describe("Task Routes", () => {
 
@@ -32,7 +62,7 @@ describe("Task Routes", () => {
       .get("/api/tasks");
 
     expect(res.statusCode).toBe(401);
-  });
+  }, 30000);
 
   it("should create a task", async () => {
     const res = await request(app)
@@ -47,7 +77,7 @@ describe("Task Routes", () => {
     expect(res.body.title).toBe("Test Task");
 
     taskId = res.body._id;
-  });
+  }, 30000);
 
   it("should get user tasks only", async () => {
     const res = await request(app)
@@ -56,6 +86,6 @@ describe("Task Routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-  });
+  }, 30000);
 
 });
